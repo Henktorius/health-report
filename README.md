@@ -2,13 +2,16 @@
 
 An AI-powered mobile application designed to help non-technical users decipher and manage their medical reports. By leveraging Gemini's structured reasoning and on-device OCR, this app transforms complex lab results into plain-language summaries and actionable medication schedules.
 
+## Demo Video
+
+https://github.com/user-attachments/assets/236c3b41-e24f-416d-ae76-574f8400b969
+
 ## 🚀 Key Features
 
 * **Intelligent Summarization:** Upload a photo of a lab report and receive a structured, easy-to-understand breakdown of key results, flags, and actionable insights.
 * **Contextual Chat:** Engage in a multi-turn, persistent chat grounded in your specific report to ask follow-up questions.
 * **Smart Medication Tracking:** The app automatically derives dosage schedules from report text, providing medication reminders, dose counters, and a simple "Track" interface.
 * **Privacy-First Design:** Your API keys are stored securely on-device using Keychain/Keystore. All medical history and conversations are persisted locally.
-* **Modern UX:** Built with a semantic, themable UI supporting both light and dark modes.
 
 ## 🛠 Tech Stack
 
