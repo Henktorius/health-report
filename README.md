@@ -47,14 +47,3 @@ This project uses a **Development Build** workflow. It does *not* support Expo G
 
 *Note: Adding native modules requires running `expo prebuild`.*
 
-## 📋 Project Structure
-
-The project follows a standard Expo Router file-based structure:
-
-* `app/`: Routing and screen definitions.
-* `app/(tabs)/`: Main navigation (Reports & Medications).
-* `lib/`: Core logic (Gemini integration, Medication parsing, Persistence helpers).
-* `components/`: Themed UI components.
-* `hooks/`: Shared state logic (Medications, Conversations, Settings).
-* `constants/`: Theme definitions and configuration constants.
-
