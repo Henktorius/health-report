@@ -1,50 +1,51 @@
-# Welcome to your Expo app 👋
+# Medical Report Assistant
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+An AI-powered mobile application designed to help non-technical users decipher and manage their medical reports. By leveraging Gemini's structured reasoning and on-device OCR, this app transforms complex lab results into plain-language summaries and actionable medication schedules.
 
-## Get started
+## 🚀 Key Features
 
-1. Install dependencies
+* **Intelligent Summarization:** Upload a photo of a lab report and receive a structured, easy-to-understand breakdown of key results, flags, and actionable insights.
+* **Contextual Chat:** Engage in a multi-turn, persistent chat grounded in your specific report to ask follow-up questions.
+* **Smart Medication Tracking:** The app automatically derives dosage schedules from report text, providing medication reminders, dose counters, and a simple "Track" interface.
+* **Privacy-First Design:** Your API keys are stored securely on-device using Keychain/Keystore. All medical history and conversations are persisted locally.
+* **Modern UX:** Built with a semantic, themable UI supporting both light and dark modes.
 
-   ```bash
-   npm install
-   ```
+## 🛠 Tech Stack
 
-2. Start the app
+* **Framework:** React Native 0.81 + Expo SDK 54 (`expo-router`).
+* **Architecture:** Enabled New Architecture (Fabric/TurboModules) + React Compiler.
+* **AI:** Google Gemini API (structured JSON output).
+* **OCR:** On-device Google ML Kit via `@react-native-ml-kit/text-recognition`.
+* **Persistence:** `expo-secure-store` (credentials) & `async-storage` (data).
 
-   ```bash
-   npx expo start
-   ```
+## ⚙️ Development
 
-In the output, you'll find options to open the app in a
+This project uses a **Development Build** workflow. It does *not* support Expo Go.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Prerequisites
+* Node.js (latest LTS recommended).
+* Configured React Native development environment (Android Studio / Xcode).
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+### Setup
+1.  **Clone the repository.**
+2.  **Install dependencies:**
+    ```bash
+    npm install
+    ```
+3.  **Run the app:**
+    * For Android: `npm run android`
+    * For iOS: `npm run ios`
 
-## Get a fresh project
+*Note: Adding native modules requires running `expo prebuild`.*
 
-When you're ready, run:
+## 📋 Project Structure
 
-```bash
-npm run reset-project
-```
+The project follows a standard Expo Router file-based structure:
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+* `app/`: Routing and screen definitions.
+* `app/(tabs)/`: Main navigation (Reports & Medications).
+* `lib/`: Core logic (Gemini integration, Medication parsing, Persistence helpers).
+* `components/`: Themed UI components.
+* `hooks/`: Shared state logic (Medications, Conversations, Settings).
+* `constants/`: Theme definitions and configuration constants.
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
