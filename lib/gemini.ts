@@ -325,3 +325,133 @@ export async function summarizeReport({
   const summary = parseSummaryResponse(text);
   return { summary, modelUsed: trimmedModel };
 }
+
+/* ------------------------------------------------------------------ *
+ *  Multi-turn chat about an already-summarized report
+ * ------------------------------------------------------------------ */
+
+const CHAT_SYSTEM_INSTRUCTION = `You are a health-literacy assistant helping a patient understand their own medical report. They have already received an initial structured summary and are now asking follow-up questions.
+
+Rules:
+- Use plain, casual, non-technical English. When you must use a medical term, define it in the same sentence.
+- Keep answers short and focused — a few sentences is usually enough. Use bullet points only when listing distinct items.
+- Ground every answer in what the report actually says. If the patient asks something the report does not cover, say so honestly instead of guessing.
+- Never invent values, ranges, dosages, or diagnoses. Never recommend specific treatments or dosages.
+- You may suggest the patient ask their doctor about something, but you are not a substitute for one.
+- Do not repeat the entire summary — the patient has already seen it. Answer the specific question they asked.`;
+
+export interface ChatTurn {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatArgs {
+  apiKey: string;
+  model: string;
+  reportText: string;
+  summary: ReportSummary;
+  history: ChatTurn[];
+  userMessage: string;
+  signal?: AbortSignal;
+}
+
+export interface ChatResult {
+  reply: string;
+  modelUsed: string;
+}
+
+function buildChatContext(reportText: string, summary: ReportSummary): string {
+  return `${CHAT_SYSTEM_INSTRUCTION}
+
+----- ORIGINAL REPORT TEXT (OCR) -----
+${reportText}
+
+----- STRUCTURED SUMMARY (already shown to patient) -----
+${JSON.stringify(summary, null, 2)}`;
+}
+
+export async function chatAboutReport({
+  apiKey,
+  model,
+  reportText,
+  summary,
+  history,
+  userMessage,
+  signal,
+}: ChatArgs): Promise<ChatResult> {
+  if (!apiKey.trim()) {
+    throw new GeminiError('Missing Gemini API key.');
+  }
+  if (!userMessage.trim()) {
+    throw new GeminiError('Empty message.');
+  }
+
+  const trimmedModel = model.trim() || DEFAULT_GEMINI_MODEL;
+  const url = `${GEMINI_BASE_URL}/${encodeURIComponent(trimmedModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+  const contents = [
+    ...history.map((turn) => ({
+      role: turn.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: turn.content }],
+    })),
+    {
+      role: 'user',
+      parts: [{ text: userMessage }],
+    },
+  ];
+
+  const body = {
+    systemInstruction: {
+      parts: [{ text: buildChatContext(reportText, summary) }],
+    },
+    contents,
+    generationConfig: {
+      temperature: 0.4,
+      topP: 0.95,
+    },
+  };
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (err: any) {
+    throw new GeminiError(
+      err?.message ? `Network error: ${err.message}` : 'Network error reaching Gemini.'
+    );
+  }
+
+  const rawText = await response.text();
+  let json: any = null;
+  try {
+    json = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    // handled below
+  }
+
+  if (!response.ok) {
+    const apiMessage = json?.error?.message;
+    throw new GeminiError(
+      apiMessage ? `Gemini API: ${apiMessage}` : `Gemini request failed (${response.status}).`,
+      response.status
+    );
+  }
+
+  const candidate = json?.candidates?.[0];
+  const finishReason: string | undefined = candidate?.finishReason;
+  const parts: { text?: string }[] = candidate?.content?.parts ?? [];
+  const reply = parts.map((p) => p?.text ?? '').join('').trim();
+
+  if (!reply) {
+    if (finishReason && finishReason !== 'STOP') {
+      throw new GeminiError(`Gemini returned no text (finishReason: ${finishReason}).`);
+    }
+    throw new GeminiError('Gemini returned an empty response.');
+  }
+
+  return { reply, modelUsed: trimmedModel };
+}
