@@ -14,7 +14,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { ReportSummary } from '@/lib/gemini';
+import type { Medication, ReportSummary } from '@/lib/gemini';
 
 const INDEX_KEY = 'conversations:index';
 const CONVERSATION_PREFIX = 'conversation:';
@@ -26,6 +26,8 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   createdAt: number;
+  /** Medications the AI extracted in this turn — surfaced as track-cards in the UI. */
+  medications?: Medication[];
 }
 
 export interface Conversation {
@@ -163,6 +165,9 @@ export async function appendMessage(
     role: message.role,
     content: message.content,
     createdAt: message.createdAt ?? Date.now(),
+    ...(message.medications && message.medications.length > 0
+      ? { medications: message.medications }
+      : {}),
   };
 
   conv.messages.push(full);

@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
+import { MedicationSuggestionCard } from '@/components/medication-suggestion-card';
 import type {
   KeyResult,
   Medication,
@@ -24,9 +25,16 @@ const STATUS_META: Record<
 interface Props {
   summary: ReportSummary;
   modelLabel?: string;
+  onTrackMedication?: (medication: Medication) => Promise<void> | void;
+  trackedMedicationKeys?: Set<string>;
 }
 
-export function ReportSummaryView({ summary, modelLabel }: Props) {
+export function ReportSummaryView({
+  summary,
+  modelLabel,
+  onTrackMedication,
+  trackedMedicationKeys,
+}: Props) {
   const isEmpty =
     !summary.overview &&
     summary.flags.length === 0 &&
@@ -64,11 +72,25 @@ export function ReportSummaryView({ summary, modelLabel }: Props) {
       ) : null}
 
       {summary.medications.length > 0 ? (
-        <Section title="Medications">
-          {summary.medications.map((m, i) => (
-            <MedicationRow key={`m-${i}`} med={m} isLast={i === summary.medications.length - 1} />
-          ))}
-        </Section>
+        onTrackMedication ? (
+          <View style={styles.medicationCardStack}>
+            <ThemedText style={styles.medicationStackTitle}>Medications</ThemedText>
+            {summary.medications.map((m, i) => (
+              <MedicationSuggestionCard
+                key={`m-${i}`}
+                medication={m}
+                onTrack={onTrackMedication}
+                alreadyTracked={trackedMedicationKeys?.has(m.name.toLowerCase())}
+              />
+            ))}
+          </View>
+        ) : (
+          <Section title="Medications">
+            {summary.medications.map((m, i) => (
+              <MedicationRow key={`m-${i}`} med={m} isLast={i === summary.medications.length - 1} />
+            ))}
+          </Section>
+        )
       ) : null}
 
       {summary.symptoms.length > 0 ? (
@@ -386,5 +408,17 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
     marginTop: 4,
+  },
+  medicationCardStack: {
+    gap: 8,
+  },
+  medicationStackTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8E8E93',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 2,
+    marginLeft: 4,
   },
 });

@@ -49,16 +49,27 @@ export default function IndexScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor }}>
       <View style={styles.topBar}>
         <ThemedText type="title" style={styles.appTitle}>
-          Health Reports
+          Reports
         </ThemedText>
-        <Pressable
-          onPress={() => router.push('/settings')}
-          style={styles.iconButton}
-          hitSlop={10}
-          accessibilityLabel="Open settings"
-        >
-          <Ionicons name="settings-outline" size={24} color={iconColor} />
-        </Pressable>
+        <View style={styles.topBarActions}>
+          <Pressable
+            onPress={() => router.push('/new' as any)}
+            style={styles.newButton}
+            hitSlop={6}
+            accessibilityLabel="Start a new conversation"
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <ThemedText style={styles.newButtonText}>New</ThemedText>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push('/settings')}
+            style={styles.iconButton}
+            hitSlop={10}
+            accessibilityLabel="Open settings"
+          >
+            <Ionicons name="settings-outline" size={24} color={iconColor} />
+          </Pressable>
+        </View>
       </View>
 
       {isLoading ? (
@@ -84,16 +95,6 @@ export default function IndexScreen() {
         />
       )}
 
-      <View style={styles.fabContainer}>
-        <Pressable
-          onPress={() => router.push('/new' as any)}
-          style={styles.fab}
-          accessibilityLabel="Start a new conversation"
-        >
-          <Ionicons name="add" size={28} color="#FFFFFF" />
-          <ThemedText style={styles.fabText}>New Report</ThemedText>
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
@@ -198,7 +199,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 120,
+    paddingBottom: 32,
   },
   row: {
     flexDirection: 'row',
@@ -237,30 +238,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  fab: {
+  topBarActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 22,
-    paddingVertical: 14,
-    borderRadius: 30,
     gap: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
   },
-  fabText: {
+  newButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+  },
+  newButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
 });

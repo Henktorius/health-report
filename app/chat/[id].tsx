@@ -17,15 +17,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ReportSummaryView } from '@/components/report-summary-view';
+import { MedicationSuggestionCard } from '@/components/medication-suggestion-card';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { useGeminiSettings } from '@/hooks/use-gemini-settings';
+import { useMedications } from '@/hooks/use-medications';
 import {
   appendMessage,
   getConversation,
   type ChatMessage,
   type Conversation,
 } from '@/lib/conversations';
-import { GeminiError, chatAboutReport, type ChatTurn } from '@/lib/gemini';
+import { GeminiError, chatAboutReport, type ChatTurn, type Medication } from '@/lib/gemini';
 
 type ListItem =
   | { kind: 'summary'; id: 'summary' }
@@ -39,11 +41,31 @@ export default function ChatScreen() {
   const textColor = useThemeColor({}, 'text');
   const iconColor = useThemeColor({}, 'icon');
   const { settings, isConfigured, reload: reloadSettings } = useGeminiSettings();
+  const { medications: trackedMeds, add: addTrackedMedication, reload: reloadMedications } =
+    useMedications();
 
   useFocusEffect(
     useCallback(() => {
       reloadSettings();
-    }, [reloadSettings])
+      reloadMedications();
+    }, [reloadSettings, reloadMedications])
+  );
+
+  const trackedKeys = (() => {
+    const set = new Set<string>();
+    for (const m of trackedMeds) {
+      if (!m.archived && (!m.conversationId || m.conversationId === id)) {
+        set.add(m.name.toLowerCase());
+      }
+    }
+    return set;
+  })();
+
+  const handleTrackMedication = useCallback(
+    async (medication: Medication) => {
+      await addTrackedMedication(medication, id);
+    },
+    [addTrackedMedication, id]
   );
 
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -113,7 +135,7 @@ export default function ChatScreen() {
       .map((m) => ({ role: m.role, content: m.content }));
 
     try {
-      const { reply } = await chatAboutReport({
+      const { reply, medications } = await chatAboutReport({
         apiKey: settings.apiKey,
         model: settings.model,
         reportText: conversation.reportText,
@@ -124,6 +146,7 @@ export default function ChatScreen() {
       const afterAssistant = await appendMessage(conversation.id, {
         role: 'assistant',
         content: reply,
+        medications,
       });
       if (afterAssistant) setConversation(afterAssistant);
       scrollToEnd();
@@ -188,6 +211,8 @@ export default function ChatScreen() {
                   <ReportSummaryView
                     summary={conversation.summary}
                     modelLabel={settings.model}
+                    onTrackMedication={handleTrackMedication}
+                    trackedMedicationKeys={trackedKeys}
                   />
                 </View>
               );
@@ -201,7 +226,25 @@ export default function ChatScreen() {
                 </View>
               );
             }
-            return <MessageBubble message={item.message} textColor={textColor} />;
+            return (
+              <View>
+                <MessageBubble message={item.message} textColor={textColor} />
+                {item.message.role === 'assistant' &&
+                item.message.medications &&
+                item.message.medications.length > 0 ? (
+                  <View style={styles.medicationStack}>
+                    {item.message.medications.map((m, idx) => (
+                      <MedicationSuggestionCard
+                        key={`${item.message.id}-med-${idx}`}
+                        medication={m}
+                        onTrack={handleTrackMedication}
+                        alreadyTracked={trackedKeys.has(m.name.toLowerCase())}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            );
           }}
         />
 
@@ -293,6 +336,12 @@ const styles = StyleSheet.create({
   summaryWrapper: {
     alignItems: 'center',
     marginBottom: 8,
+  },
+  medicationStack: {
+    gap: 8,
+    marginTop: 4,
+    marginBottom: 6,
+    marginHorizontal: 4,
   },
   bubbleRow: {
     flexDirection: 'row',

@@ -38,6 +38,14 @@ export interface Medication {
   dosage?: string;
   purpose?: string;
   notes?: string;
+  /** Human-readable schedule, e.g. "every 8 hours" or "twice daily". */
+  frequency?: string;
+  /** Hours between doses, derived from the frequency (e.g. "every 8 hours" → 8). */
+  intervalHours?: number;
+  /** Total number of doses in the prescribed course, when a duration is specified. */
+  totalDoses?: number;
+  /** Length of the prescribed course in days, when explicitly stated. */
+  durationDays?: number;
 }
 
 export interface Symptom {
@@ -79,7 +87,43 @@ You MUST return a JSON object that conforms to the provided schema. Follow these
 - For each key result, set "status" by comparing the value to any normal range printed in the report: "high", "low", "borderline", or "normal". Use "unknown" when no range is given.
 - "flags" lists at most 3 short phrases the patient should pay attention to (e.g. clearly out-of-range values, urgent terms). If nothing is flag-worthy, return an empty array.
 - "questionsForDoctor" lists at most 3 short, specific questions the patient could realistically ask, grounded in what the report actually says.
+- For each medication that has dosing instructions in the report, populate the "frequency" field with a short human-readable phrase ("every 8 hours", "twice daily", "once a day at bedtime"), and derive "intervalHours" as a number (every 8 hours → 8, twice daily → 12, once daily → 24, three times a day → 8). If a course duration is specified ("for 7 days"), set "durationDays" and compute "totalDoses" = durationDays × doses-per-day. Omit any of these fields when the report does not give enough information to fill them — never guess.
 - Do not diagnose, do not recommend treatment, do not editorialize beyond plain explanation.`;
+
+const MEDICATION_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    name: { type: 'STRING' },
+    dosage: { type: 'STRING' },
+    frequency: { type: 'STRING' },
+    intervalHours: { type: 'NUMBER' },
+    totalDoses: { type: 'NUMBER' },
+    durationDays: { type: 'NUMBER' },
+    purpose: { type: 'STRING' },
+    notes: { type: 'STRING' },
+  },
+  required: ['name'],
+} as const;
+
+function normalizeMedication(m: any): Medication | null {
+  if (!m || typeof m !== 'object') return null;
+  const name = typeof m.name === 'string' ? m.name.trim() : '';
+  if (!name) return null;
+  const numOrUndef = (v: any) =>
+    typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
+  const strOrUndef = (v: any) =>
+    typeof v === 'string' && v.trim() ? v.trim() : undefined;
+  return {
+    name,
+    dosage: strOrUndef(m.dosage),
+    purpose: strOrUndef(m.purpose),
+    notes: strOrUndef(m.notes),
+    frequency: strOrUndef(m.frequency),
+    intervalHours: numOrUndef(m.intervalHours),
+    totalDoses: numOrUndef(m.totalDoses),
+    durationDays: numOrUndef(m.durationDays),
+  };
+}
 
 const RESPONSE_SCHEMA = {
   type: 'OBJECT',
@@ -108,16 +152,7 @@ const RESPONSE_SCHEMA = {
     },
     medications: {
       type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          name: { type: 'STRING' },
-          dosage: { type: 'STRING' },
-          purpose: { type: 'STRING' },
-          notes: { type: 'STRING' },
-        },
-        required: ['name'],
-      },
+      items: MEDICATION_SCHEMA,
     },
     symptoms: {
       type: 'ARRAY',
@@ -204,13 +239,8 @@ export function parseSummaryResponse(rawText: string): ReportSummary {
 
   const medications: Medication[] = Array.isArray(payload.medications)
     ? payload.medications
-        .filter((m: any) => m && typeof m === 'object' && typeof m.name === 'string' && m.name.trim())
-        .map((m: any) => ({
-          name: m.name.trim(),
-          dosage: typeof m.dosage === 'string' && m.dosage.trim() ? m.dosage.trim() : undefined,
-          purpose: typeof m.purpose === 'string' && m.purpose.trim() ? m.purpose.trim() : undefined,
-          notes: typeof m.notes === 'string' && m.notes.trim() ? m.notes.trim() : undefined,
-        }))
+        .map(normalizeMedication)
+        .filter((m: Medication | null): m is Medication => m !== null)
     : [];
 
   const symptoms: Symptom[] = Array.isArray(payload.symptoms)
@@ -332,13 +362,78 @@ export async function summarizeReport({
 
 const CHAT_SYSTEM_INSTRUCTION = `You are a health-literacy assistant helping a patient understand their own medical report. They have already received an initial structured summary and are now asking follow-up questions.
 
-Rules:
-- Use plain, casual, non-technical English. When you must use a medical term, define it in the same sentence.
+You MUST return a JSON object that conforms to the provided schema:
+- "text" is your reply to the patient, in plain casual non-technical English.
+- "medications" is an OPTIONAL array of medications you are referring to *that are present in the report* and that the patient could plausibly want to track. Only include a medication when your reply is actually about that medication or a class of medications they're on. Do NOT echo every medication in the report on every turn. Do NOT invent medications. If your reply is not about a specific medication, return an empty "medications" array (or omit it).
+
+Style rules for "text":
+- Plain, casual, non-technical English. When you must use a medical term, define it in the same sentence.
 - Keep answers short and focused — a few sentences is usually enough. Use bullet points only when listing distinct items.
 - Ground every answer in what the report actually says. If the patient asks something the report does not cover, say so honestly instead of guessing.
 - Never invent values, ranges, dosages, or diagnoses. Never recommend specific treatments or dosages.
 - You may suggest the patient ask their doctor about something, but you are not a substitute for one.
-- Do not repeat the entire summary — the patient has already seen it. Answer the specific question they asked.`;
+- Do not repeat the entire summary — the patient has already seen it. Answer the specific question they asked.
+
+Rules for medications array (when populated):
+- "name" is required. Match the medication name exactly as it appears in the report.
+- Populate "frequency" (human-readable) and "intervalHours" (number) when the report gives a dosing schedule. "every 8 hours" → 8; "twice daily" → 12; "once daily" → 24; "three times a day" → 8.
+- Populate "durationDays" and compute "totalDoses" (= durationDays × doses-per-day) when the report specifies a course length.
+- Omit any field the report does not support. Never guess.`;
+
+const CHAT_RESPONSE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    text: { type: 'STRING' },
+    medications: {
+      type: 'ARRAY',
+      items: MEDICATION_SCHEMA,
+    },
+  },
+  required: ['text'],
+} as const;
+
+export interface ChatReply {
+  text: string;
+  medications: Medication[];
+}
+
+/** Defensive parser for the chat structured response. */
+export function parseChatResponse(rawText: string): ChatReply {
+  const trimmed = rawText.trim();
+  if (!trimmed) {
+    throw new GeminiError('Gemini returned an empty response.');
+  }
+  let payload: any;
+  try {
+    payload = JSON.parse(trimmed);
+  } catch {
+    const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenced) {
+      try {
+        payload = JSON.parse(fenced[1]);
+      } catch {
+        throw new GeminiError('Gemini chat response was not valid JSON.');
+      }
+    } else {
+      // Last resort: treat the whole string as the text reply with no medications.
+      return { text: trimmed, medications: [] };
+    }
+  }
+  if (!payload || typeof payload !== 'object') {
+    return { text: trimmed, medications: [] };
+  }
+  const text =
+    typeof payload.text === 'string' && payload.text.trim() ? payload.text.trim() : '';
+  const medications: Medication[] = Array.isArray(payload.medications)
+    ? payload.medications
+        .map(normalizeMedication)
+        .filter((m: Medication | null): m is Medication => m !== null)
+    : [];
+  if (!text) {
+    throw new GeminiError('Gemini chat response had no text.');
+  }
+  return { text, medications };
+}
 
 export interface ChatTurn {
   role: 'user' | 'assistant';
@@ -357,6 +452,7 @@ export interface ChatArgs {
 
 export interface ChatResult {
   reply: string;
+  medications: Medication[];
   modelUsed: string;
 }
 
@@ -408,6 +504,8 @@ export async function chatAboutReport({
     generationConfig: {
       temperature: 0.4,
       topP: 0.95,
+      responseMimeType: 'application/json',
+      responseSchema: CHAT_RESPONSE_SCHEMA,
     },
   };
 
@@ -444,14 +542,15 @@ export async function chatAboutReport({
   const candidate = json?.candidates?.[0];
   const finishReason: string | undefined = candidate?.finishReason;
   const parts: { text?: string }[] = candidate?.content?.parts ?? [];
-  const reply = parts.map((p) => p?.text ?? '').join('').trim();
+  const rawReply = parts.map((p) => p?.text ?? '').join('').trim();
 
-  if (!reply) {
+  if (!rawReply) {
     if (finishReason && finishReason !== 'STOP') {
       throw new GeminiError(`Gemini returned no text (finishReason: ${finishReason}).`);
     }
     throw new GeminiError('Gemini returned an empty response.');
   }
 
-  return { reply, modelUsed: trimmedModel };
+  const { text, medications } = parseChatResponse(rawReply);
+  return { reply: text, medications, modelUsed: trimmedModel };
 }
