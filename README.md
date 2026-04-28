@@ -2,6 +2,12 @@
 
 An AI-powered mobile application designed to help non-technical users decipher and manage their medical reports. By leveraging Gemini's structured reasoning and on-device OCR, this app transforms complex lab results into plain-language summaries and actionable medication schedules.
 
+## Team Members
+
+* Oscar Arranz
+* Marco Garcia
+* Carlos Ocaña
+
 ## Demo Video
 
 https://github.com/user-attachments/assets/236c3b41-e24f-416d-ae76-574f8400b969
